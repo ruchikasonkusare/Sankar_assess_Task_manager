@@ -8,7 +8,7 @@ auth = Blueprint('auth',__name__)
 @auth.route('/register',methods = ['GET','POST'])
 def register():
     if request.method == 'POST':
-        data=request.get_json()
+        data=request.form
         username=data.get('username')
         email=data.get('email')
         password=data.get('password')
@@ -28,7 +28,7 @@ def register():
 
 
 
-@auth.router('/login',methods = ['GET','POst'])
+@auth.route('/login',methods = ['GET','POST'])
 def login():
     if request.method =='POST':
         data= request.form
@@ -38,15 +38,15 @@ def login():
         user = User.query.filter_by(email=email).first()
         if user and bcrypt.check_password_hash(user.password,password):
             login_user(user)
-            return redirect('task.dashboard')
+            return redirect(url_for('tasks.dashboard'))
         
         flash ("invalid credentials","danger")
         
     return render_template("login.html")
 
         
-@auth.router('/logout')
+@auth.route('/logout')
 def logout():
     logout_user()
-    return redirect ('auth.login')
+    return redirect(url_for('auth.login'))
 

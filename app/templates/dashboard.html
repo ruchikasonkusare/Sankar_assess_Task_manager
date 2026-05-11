@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Analytics -->
+<div class="card" id="analyticsCard">
+  <h2 style="margin-bottom:16px;">📊 Analytics</h2>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;" id="analyticsGrid">
+    <div class="stat-box" style="background:#1a1a2e;color:white;padding:16px;border-radius:8px;text-align:center;">
+      <h3 id="totalTasks">0</h3><p>Total Tasks</p>
+    </div>
+    <div class="stat-box" style="background:#27ae60;color:white;padding:16px;border-radius:8px;text-align:center;">
+      <h3 id="completedTasks">0</h3><p>Completed</p>
+    </div>
+    <div class="stat-box" style="background:#e67e22;color:white;padding:16px;border-radius:8px;text-align:center;">
+      <h3 id="pendingTasks">0</h3><p>Pending</p>
+    </div>
+    <div class="stat-box" style="background:#8b1a1a;color:white;padding:16px;border-radius:8px;text-align:center;">
+      <h3 id="completionPct">0%</h3><p>Completion</p>
+    </div>
+  </div>
+</div>
+
+<!-- Add Task Form -->
+<div class="card">
+  <h2 style="margin-bottom:16px;">➕ Add New Task</h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <input id="taskTitle" placeholder="Task Title" style="padding:9px;border:1px solid #ddd;border-radius:4px;">
+    <input id="taskDesc" placeholder="Description" style="padding:9px;border:1px solid #ddd;border-radius:4px;">
+    <select id="taskPriority" style="padding:9px;border:1px solid #ddd;border-radius:4px;">
+      <option value="Low">Low</option>
+      <option value="Medium" selected>Medium</option>
+      <option value="High">High</option>
+    </select>
+    <select id="taskStatus" style="padding:9px;border:1px solid #ddd;border-radius:4px;">
+      <option value="Pending">Pending</option>
+      <option value="In Progress">In Progress</option>
+      <option value="Completed">Completed</option>
+    </select>
+  </div>
+  <button class="btn btn-primary" onclick="addTask()" style="margin-top:12px;">Add Task</button>
+</div>
+
+<!-- EDIT TASK FORM (NEW) -->
+<div class="card" id="editCard" style="display:none;">
+  <h2>✏️ Edit Task</h2>
+
+  <input type="hidden" id="editTaskId">
+
+  <input id="editTitle" placeholder="Task Title" style="padding:9px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:8px;">
+  <input id="editDesc" placeholder="Description" style="padding:9px;border:1px solid #ddd;border-radius:4px;width:100%;margin-bottom:8px;">
+
+  <select id="editPriority" style="padding:9px;width:100%;margin-bottom:8px;">
+    <option value="Low">Low</option>
+    <option value="Medium">Medium</option>
+    <option value="High">High</option>
+  </select>
+
+  <select id="editStatus" style="padding:9px;width:100%;margin-bottom:8px;">
+    <option value="Pending">Pending</option>
+    <option value="In Progress">In Progress</option>
+    <option value="Completed">Completed</option>
+  </select>
+
+  <button class="btn btn-primary" onclick="updateTask()">Update Task</button>
+</div>
+
+<!-- Task List -->
+<div class="card">
+  <h2 style="margin-bottom:16px;">📋 My Tasks</h2>
+  <div id="taskList"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.onload = () => { loadTasks(); loadAnalytics(); };
+
+/* ---------------- LOAD TASKS ---------------- */
+async function loadTasks() {
+  const res  = await fetch("/api/tasks");
+  const data = await res.json();
+
+  const list = document.getElementById("taskList");
+  list.innerHTML = "";
+
+  if (data.tasks.length === 0) {
+    list.innerHTML = "<p style='color:#aaa;text-align:center;padding:30px;'>No tasks yet. Add one above!</p>";
+    return;
+  }
+
+  data.tasks.forEach(task => {
+    const priorityColor = { Low: "#27ae60", Medium: "#e67e22", High: "#e74c3c" }[task.priority] || "#888";
+    const statusColor   = { Pending: "#888", "In Progress": "#e67e22", Completed: "#27ae60" }[task.status] || "#888";
+
+    list.innerHTML += `
+      <div style="border:1px solid #eee;border-radius:6px;padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <strong>${task.title}</strong>
+          <p style="font-size:13px;color:#666;margin-top:4px;">${task.description || "No description"}</p>
+          <p style="font-size:12px;color:#aaa;margin-top:4px;">Created: ${task.created_at}</p>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span style="background:${priorityColor};color:white;padding:3px 10px;border-radius:12px;font-size:12px;">
+            ${task.priority}
+          </span>
+
+          <span style="background:${statusColor};color:white;padding:3px 10px;border-radius:12px;font-size:12px;">
+            ${task.status}
+          </span>
+
+          <button class="btn btn-warning" onclick="editTask(${task.id}, '${task.title}', '${task.description}', '${task.priority}', '${task.status}')">
+            Edit
+          </button>
+
+          <button class="btn btn-danger" onclick="deleteTask(${task.id})">
+            Delete
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  loadAnalytics();
+}
+
+/* ---------------- ADD TASK ---------------- */
+async function addTask() {
+  const title = document.getElementById("taskTitle").value;
+  const desc = document.getElementById("taskDesc").value;
+  const priority = document.getElementById("taskPriority").value;
+  const status = document.getElementById("taskStatus").value;
+
+  if (!title.trim()) return alert("Title is required!");
+
+  await fetch("/api/tasks", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ title, description: desc, priority, status })
+  });
+
+  loadTasks();
+  loadAnalytics();
+}
+
+/* ---------------- DELETE ---------------- */
+async function deleteTask(id) {
+  if (!confirm("Delete this task?")) return;
+
+  await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+
+  loadTasks();
+  loadAnalytics();
+}
+
+/* ---------------- OPEN EDIT FORM ---------------- */
+function editTask(id, title, desc, priority, status) {
+  document.getElementById("editCard").style.display = "block";
+
+  document.getElementById("editTaskId").value = id;
+  document.getElementById("editTitle").value = title;
+  document.getElementById("editDesc").value = desc;
+  document.getElementById("editPriority").value = priority;
+  document.getElementById("editStatus").value = status;
+}
+
+/* ---------------- UPDATE TASK ---------------- */
+async function updateTask() {
+  const id = document.getElementById("editTaskId").value;
+
+  await fetch(`/api/tasks/${id}`, {
+    method: "PUT",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      title: document.getElementById("editTitle").value,
+      description: document.getElementById("editDesc").value,
+      priority: document.getElementById("editPriority").value,
+      status: document.getElementById("editStatus").value
+    })
+  });
+
+  document.getElementById("editCard").style.display = "none";
+
+  loadTasks();
+  loadAnalytics();
+}
+
+/* ---------------- ANALYTICS ---------------- */
+async function loadAnalytics() {
+  const res  = await fetch("/api/analytics");
+  const data = await res.json();
+  const a = data.analytics;
+
+  document.getElementById("totalTasks").textContent = a.total_tasks;
+  document.getElementById("completedTasks").textContent = a.completed_tasks;
+  document.getElementById("pendingTasks").textContent = a.pending_tasks;
+  document.getElementById("completionPct").textContent = a.completion_percent + "%";
+}
+</script>
+{% endblock %}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Task Manager</title>
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
+    .navbar { background: #1a1a2e; color: white; padding: 14px 28px; display: flex; justify-content: space-between; align-items: center; }
+    .navbar a { color: white; text-decoration: none; margin-left: 16px; font-size: 14px; }
+    .container { max-width: 1100px; margin: 30px auto; padding: 0 16px; }
+    .card { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+    .btn { padding: 9px 18px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; }
+    .btn-primary { background: #1a1a2e; color: white; }
+    .btn-danger  { background: #e74c3c; color: white; }
+    .btn-success { background: #27ae60; color: white; }
+    .alert { padding: 10px 16px; border-radius: 4px; margin-bottom: 16px; font-size: 14px; }
+    .alert-success { background: #d4efdf; color: #1e8449; }
+    .alert-danger  { background: #fadbd8; color: #c0392b; }
+    .notification-bar { position: fixed; top: 20px; right: 20px; background: #1a1a2e; color: white; padding: 12px 20px; border-radius: 8px; font-size: 14px; display: none; z-index: 999; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <strong>📋 Smart Task Manager</strong>
+    <div>
+      {% if current_user.is_authenticated %}
+        <span>Hello, {{ current_user.username }}</span>
+        <a href="/auth/logout">Logout</a>
+      {% else %}
+        <a href="/auth/login">Login</a>
+        <a href="/auth/register">Register</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <div class="notification-bar" id="notifBar"></div>
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </div>
+
+  <script>
+    const socket = io();
+    const notifBar = document.getElementById("notifBar");
+
+    function showNotification(msg) {
+      notifBar.textContent = msg;
+      notifBar.style.display = "block";
+      setTimeout(() => notifBar.style.display = "none", 3000);
+    }
+
+    socket.on("notification", (data) => showNotification(data.message));
+    socket.on("task_added", (data) => {
+      showNotification(`✅ New task added: ${data.title}`);
+      if (typeof loadTasks === "function") loadTasks();
+      if (typeof loadAnalytics === "function") loadAnalytics();
+    });
+    socket.on("task_updated", (data) => {
+      showNotification(`✏️ Task updated: ${data.title}`);
+      if (typeof loadTasks === "function") loadTasks();
+      if (typeof loadAnalytics === "function") loadAnalytics();
+    });
+    socket.on("task_deleted", (data) => {
+      showNotification(`🗑️ Task deleted`);
+      if (typeof loadTasks === "function") loadTasks();
+      if (typeof loadAnalytics === "function") loadAnalytics();
+    });
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
